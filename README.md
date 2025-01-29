@@ -4,9 +4,7 @@ This project implements a Notification System that uses Server-Sent Events (SSE)
 
 ## Testing the Notification System
 
-You can test the notification system by sending POST requests to the backend using Postman.
-
-- URL: `http://localhost:5001/send-notification`
+You can test the notification system using Postman by sending POST requests `http://localhost:5001/send-notification`
 
 1. Headers:
 
@@ -14,7 +12,8 @@ You can test the notification system by sending POST requests to the backend usi
 - Value: application/json
 - Body (raw JSON):
 
-```{
+```
+{
   "message": "You have a new notification!",
   "username": "Admin",
   "profileImage": "https://example.com/avatar.jpg",
