@@ -1,38 +1,58 @@
 const express = require("express");
 const cors = require("cors");
-const mysql = require("mysql");
-require("dotenv").config(); // Load environment variables
-
-const db = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-});
 
 const app = express();
-app.use(cors());
+
+// ✅ Enable CORS to allow frontend access
+app.use(cors({
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type"],
+}));
+
 app.use(express.json());
 
+let clients = [];
 
-db.connect((err) => {
-    if (err) {
-        console.error("Database connection failed:", err);
-    } else {
-        console.log("Connected to MySQL");
-    }
-});
+// ✅ SSE Notifications Endpoint
+app.get("/notifications", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
 
-// Sample Route
-app.get("/api/data", (req, res) => {
-    db.query("SELECT * FROM your_table", (err, result) => {
-        if (err) {
-            return res.status(500).send(err);
-        }
-        res.json(result);
+    res.write(`: Connection established\n\n`);
+    clients.push(res);
+
+    req.on("close", () => {
+        clients = clients.filter(client => client !== res);
     });
 });
 
-// Start Server
-const PORT = process.env.PORT || 5000;
+// ✅ Function to Send Notifications
+const sendNotification = (notification) => {
+    const message = `data: ${JSON.stringify(notification)}\n\n`;
+    clients.forEach(client => client.write(message));
+};
+
+// ✅ API to Send Notifications from Postman
+app.post("/send-notification", (req, res) => {
+    const { message, username, profileImage, source } = req.body;
+
+    if (!message || !username || !profileImage || !source) {
+        return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const notification = {
+        message,
+        username,
+        profileImage,
+        source,
+        timestamp: new Date(),
+    };
+
+    sendNotification(notification);
+    res.json({ success: true, notification });
+});
+
+const PORT = 5001;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
