@@ -17,6 +17,8 @@ You can test the notification system using Postman by sending POST requests `htt
   "message": "You have a new notification!",
   "username": "Admin",
   "profileImage": "https://example.com/avatar.jpg",
-  "source": "System"
+  <!-- "source": "System", -->
+  "notificationType": "interactive"
+
 }
 ```
