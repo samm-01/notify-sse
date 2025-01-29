@@ -1,26 +1,21 @@
 const express = require("express");
 const cors = require("cors");
-
 const app = express();
+const port = 5001;
 
-// ✅ Enable CORS to allow frontend access
-app.use(cors({
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type"],
-}));
-
+app.use(cors());
 app.use(express.json());
 
+// SSE (Server-Sent Events) setup
 let clients = [];
 
-// ✅ SSE Notifications Endpoint
 app.get("/notifications", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    res.write(`: Connection established\n\n`);
+    res.flushHeaders();
+
     clients.push(res);
 
     req.on("close", () => {
@@ -28,19 +23,9 @@ app.get("/notifications", (req, res) => {
     });
 });
 
-// ✅ Function to Send Notifications
-const sendNotification = (notification) => {
-    const message = `data: ${JSON.stringify(notification)}\n\n`;
-    clients.forEach(client => client.write(message));
-};
-
-// ✅ API to Send Notifications from Postman
+// Send interactive notification (Accept/Decline)
 app.post("/send-notification", (req, res) => {
-    const { message, username, profileImage, source } = req.body;
-
-    if (!message || !username || !profileImage || !source) {
-        return res.status(400).json({ error: "Missing required fields" });
-    }
+    const { message, username, profileImage, source, notificationType } = req.body;
 
     const notification = {
         message,
@@ -48,11 +33,28 @@ app.post("/send-notification", (req, res) => {
         profileImage,
         source,
         timestamp: new Date(),
+        notificationType,  //  field to identify the type of notification
     };
 
-    sendNotification(notification);
-    res.json({ success: true, notification });
+    // Broadcasting notification to all clients
+    clients.forEach(client => {
+        client.write(`data: ${JSON.stringify(notification)}\n\n`);
+    });
+
+    res.status(200).send("Notification sent");
 });
 
-const PORT = 5001;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.post("/notification-response", (req, res) => {
+    const { notificationId, action } = req.body;
+
+    // Store the response in the database (or process it accordingly)
+    console.log(`Notification ID: ${notificationId} - Action: ${action}`);
+
+    // For now, just send a response back
+    res.json({ success: true, message: `Action '${action}' recorded for notification ${notificationId}` });
+});
+
+
+app.listen(port, () => {
+    console.log(`Server running at http://localhost:${port}`);
+});

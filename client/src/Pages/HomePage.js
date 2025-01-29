@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { FaBell } from "react-icons/fa";
 import { formatDistanceToNow } from "date-fns";
+import { useNavigate } from "react-router-dom";
+
 
 function NotificationSystem() {
     const [notifications, setNotifications] = useState([]);
@@ -12,7 +14,7 @@ function NotificationSystem() {
 
         eventSource.onmessage = (event) => {
             const newNotif = JSON.parse(event.data);
-            setNotifications((prev) => [newNotif, ...prev]); // Add new notifications to the top
+            setNotifications((prev) => [newNotif, ...prev]);
             setNewNotification(true);
         };
 
@@ -28,14 +30,33 @@ function NotificationSystem() {
         setShowNotifications(!showNotifications);
         setNewNotification(false);
     };
+    const navigate = useNavigate();
 
     const goToNotificationsPage = () => {
-        alert("Redirecting to Notifications Page...");
+        navigate("/all-notifications");
+    };
+
+    const handleButtonClick = (notifId, action) => {
+        // Send the response back to the server
+        fetch("http://localhost:5001/notification-response", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                notificationId: notifId,
+                action: action,
+            }),
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                console.log("Response recorded:", data);
+            })
+            .catch((error) => console.error("Error recording response:", error));
     };
 
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col items-center p-6">
-            {/* Header */}
             <header className="w-full max-w-3xl flex items-center justify-between bg-white shadow-md p-4 rounded-lg">
                 <h1 className="text-lg font-semibold text-gray-800">Notification System</h1>
                 <div className="relative" onClick={handleBellClick}>
@@ -45,14 +66,20 @@ function NotificationSystem() {
             </header>
 
             {/* View All Notifications Button */}
-            <button className="m-4 bg-gray-600 hover:bg-slate-800 text-white px-4 py-2 rounded-md" onClick={goToNotificationsPage}>
+            <button
+
+                className="m-4 bg-gray-600 hover:bg-slate-800 text-white px-4 py-2 rounded-md"
+                onClick={goToNotificationsPage}
+            >
                 View All Notifications
             </button>
 
             {/* Notification Dropdown */}
             {showNotifications && (
                 <div className="absolute top-16 right-6 w-96 bg-white border border-gray-200 shadow-lg rounded-lg z-10">
-                    <h4 className="text-lg font-medium text-gray-700 px-4 py-2 border-b border-gray-100">Notifications</h4>
+                    <h4 className="text-lg font-medium text-gray-700 px-4 py-2 border-b border-gray-100">
+                        Notifications
+                    </h4>
                     <ul className="divide-y divide-gray-100">
                         {notifications.length > 0 ? (
                             notifications.map((notif, index) => (
@@ -64,11 +91,25 @@ function NotificationSystem() {
                                             <div className="font-semibold text-gray-800">{notif.username}</div>
                                             <div className="text-xs text-gray-500">{notif.source}</div>
                                             <p className="text-sm text-gray-700">{notif.message}</p>
-                                            <p className="text-xs text-gray-400">{formatDistanceToNow(new Date(), { addSuffix: true })}</p>
-                                            {notif.document && (
-                                                <a href={`http://localhost:8080${notif.document}`} download className="text-blue-600 underline text-sm mt-2">
-                                                    Download Document
-                                                </a>
+                                            <p className="text-xs text-gray-400">
+                                                {formatDistanceToNow(new Date(), { addSuffix: true })}
+                                            </p>
+                                            {/* Accept/Decline Buttons */}
+                                            {notif.notificationType === "interactive" && (
+                                                <div className="mt-2">
+                                                    <button
+                                                        onClick={() => handleButtonClick(notif.id, "accept")}
+                                                        className="bg-green-800 hover:bg-green-600 text-white px-4 py-2 rounded-md mr-2"
+                                                    >
+                                                        Accept
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleButtonClick(notif.id, "decline")}
+                                                        className="bg-red-800 hover:bg-red-600 text-white px-4 py-2 rounded-md"
+                                                    >
+                                                        Decline
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
