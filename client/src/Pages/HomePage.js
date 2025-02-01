@@ -3,6 +3,7 @@ import { FaBell } from "react-icons/fa";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
+const userId = "123"; // Replace with dynamic userId from auth context or state
 
 function NotificationSystem() {
     const [notifications, setNotifications] = useState([]);
@@ -10,7 +11,8 @@ function NotificationSystem() {
     const [newNotification, setNewNotification] = useState(false);
 
     useEffect(() => {
-        const eventSource = new EventSource("http://localhost:5001/notifications");
+        // Connect to the SSE endpoint with userId
+        const eventSource = new EventSource(`http://localhost:5050/notifications/${userId}`);
 
         eventSource.onmessage = (event) => {
             const newNotif = JSON.parse(event.data);
@@ -37,16 +39,15 @@ function NotificationSystem() {
     };
 
     const handleButtonClick = (notifId, action) => {
-        // Send the response back to the server
-        fetch("http://localhost:5001/notification-response", {
+        // Ensure notifId exists
+        if (!notifId) return;
+
+        fetch("http://localhost:5050/notification-response", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-                notificationId: notifId,
-                action: action,
-            }),
+            body: JSON.stringify({ notificationId: notifId, action }),
         })
             .then((response) => response.json())
             .then((data) => {
@@ -67,7 +68,6 @@ function NotificationSystem() {
 
             {/* View All Notifications Button */}
             <button
-
                 className="m-4 bg-gray-600 hover:bg-slate-800 text-white px-4 py-2 rounded-md"
                 onClick={goToNotificationsPage}
             >
@@ -91,11 +91,12 @@ function NotificationSystem() {
                                             <div className="font-semibold text-gray-800">{notif.username}</div>
                                             <div className="text-xs text-gray-500">{notif.source}</div>
                                             <p className="text-sm text-gray-700">{notif.message}</p>
+                                            {/* Correct timestamp usage */}
                                             <p className="text-xs text-gray-400">
-                                                {formatDistanceToNow(new Date(), { addSuffix: true })}
+                                                {formatDistanceToNow(new Date(notif.timestamp), { addSuffix: true })}
                                             </p>
                                             {/* Accept/Decline Buttons */}
-                                            {notif.notificationType === "interactive" && (
+                                            {notif.notificationType === "interactive" && notif.id && (
                                                 <div className="mt-2">
                                                     <button
                                                         onClick={() => handleButtonClick(notif.id, "accept")}

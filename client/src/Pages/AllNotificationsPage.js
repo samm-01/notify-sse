@@ -12,7 +12,7 @@ function AllNotificationsPage() {
 
     useEffect(() => {
         // Fetch notifications from the backend API
-        fetch("http://localhost:5001/notifications")
+        fetch("http://localhost:5050/notifications")
             .then((response) => response.json())
             .then((data) => {
                 console.log('Fetched notifications:', data); // Log the data received

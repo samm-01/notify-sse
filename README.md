@@ -4,7 +4,7 @@ This project implements a Notification System that uses Server-Sent Events (SSE)
 
 ## Testing the Notification System
 
-You can test the notification system using Postman by sending POST requests `http://localhost:5001/send-notification`
+You can test the notification system using Postman by sending POST requests `http://localhost:5050/send-notification`
 
 1. Headers:
 
