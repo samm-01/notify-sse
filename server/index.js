@@ -1,20 +1,20 @@
 const express = require("express");
 const cors = require("cors");
+const mysql = require('mysql2');
+require("dotenv").config();
+
 const app = express();
 const port = 5050;
-const mysql = require('mysql2')
-require("dotenv").config();  // Load environment variables from .env file
-
 
 app.use(cors());
 app.use(express.json());
 
 // MySQL database connection using environment variables
 const db = mysql.createConnection({
-    host: process.env.DB_HOST,        // Database host
-    user: process.env.DB_USER,        // Database user
-    password: process.env.DB_PASSWORD, // Database password
-    database: process.env.DB_NAME     // Database name
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
 });
 
 db.connect(err => {
@@ -33,8 +33,24 @@ let clientMap = new Map();
 let groups = new Map();
 
 /**
+ * Store Notification in Database
+ */
+const storeNotification = (userId, message, username, profileImage, source, notificationType) => {
+    const query = `
+        INSERT INTO notifications (user_id, message, username, profile_image, source, notification_type)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `;
+    db.execute(query, [userId, message, username, profileImage, source, notificationType], (err, results) => {
+        if (err) {
+            console.error("Error saving notification:", err);
+        } else {
+            console.log(`Notification saved with ID: ${results.insertId}`);
+        }
+    });
+};
+
+/**
  * SSE Endpoint to Subscribe for Notifications
- * Each user connects with their userId to receive notifications.
  */
 app.get("/notifications/:userId", (req, res) => {
     const userId = req.params.userId;
@@ -75,8 +91,12 @@ app.post("/send-notification", (req, res) => {
         notificationType,
     };
 
-    // Send notification to all connected clients
+    // Save notification to the database for all users
     clients.forEach(client => {
+        const userId = clientMap.get(client); // Assuming `clientMap` is storing userId as value
+        storeNotification(userId, message, username, profileImage, source, notificationType);
+
+        // Send notification to all connected clients
         client.write(`data: ${JSON.stringify(notification)}\n\n`);
     });
 
@@ -98,6 +118,9 @@ app.post("/send-notification/:userId", (req, res) => {
         timestamp: new Date(),
         notificationType,
     };
+
+    // Save notification to the database for the specific user
+    storeNotification(userId, message, username, profileImage, source, notificationType);
 
     // Check if the user is connected before sending notification
     if (clientMap.has(userId)) {
@@ -139,9 +162,11 @@ app.post("/send-group-notification/:groupId", (req, res) => {
         notificationType,
     };
 
-    // Check if the group exists before sending notification
+    // Save notification to the database for each user in the group
     if (groups.has(groupId)) {
         groups.get(groupId).forEach(userId => {
+            storeNotification(userId, message, username, profileImage, source, notificationType);
+
             if (clientMap.has(userId)) {
                 clientMap.get(userId).write(`data: ${JSON.stringify(notification)}\n\n`);
             }
@@ -156,12 +181,32 @@ app.post("/send-group-notification/:groupId", (req, res) => {
  * Handle User Response to a Notification
  */
 app.post("/notification-response", (req, res) => {
-    const { notificationId, action } = req.body;
+    const { userId, notificationId, action } = req.body;
 
-    console.log(`Notification ID: ${notificationId} - Action: ${action}`);
+    // Check if notificationId and userId are provided and valid
+    if (!notificationId || !userId) {
+        return res.status(400).send('Notification ID and User ID are required');
+    }
 
-    res.json({ success: true, message: `Action '${action}' recorded for notification ${notificationId}` });
+    // Update the notification status to 'read'
+    const query = `UPDATE notifications SET status = 'read' WHERE id = ? AND user_id = ? AND status = 'unread'`;
+
+    db.query(query, [notificationId, userId], (err, result) => {
+        if (err) {
+            console.error('Error updating notification:', err);
+            return res.status(500).send(`Error updating notification: ${err.message}`);
+        }
+
+        // Check if any rows were affected
+        if (result.affectedRows === 0) {
+            return res.status(404).send('Notification not found or already marked as read');
+        }
+
+        console.log(`Notification ID: ${notificationId} - Action: ${action}`);
+        res.json({ success: true, message: `Action '${action}' recorded for notification ${notificationId}` });
+    });
 });
+
 
 // Start the server
 app.listen(port, () => {
