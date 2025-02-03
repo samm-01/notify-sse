@@ -4,21 +4,51 @@ This project implements a Notification System that uses Server-Sent Events (SSE)
 
 ## Testing the Notification System
 
-You can test the notification system using Postman by sending POST requests `http://localhost:5050/send-notification`
-
-1. Headers:
+### Headers:
 
 - Key: Content-Type
 - Value: application/json
-- Body (raw JSON):
+
+Post req to broadcast notification to all users `http://localhost:5050/send-notification`
+
+### Body (raw JSON):
 
 ```
 {
-  "message": "You have a new notification!",
+  "message": "This is a broadcast notification",
   "username": "Admin",
-  "profileImage": "https://example.com/avatar.jpg",
-  <!-- "source": "System", -->
-  "notificationType": "interactive"
-
+  "profileImage": "https://via.placeholder.com/50",
+  "source": "System",
+  "notificationType": "general"
 }
+
+```
+
+To mark the notification as read `http://localhost:5050/notification-response`
+
+### Body (raw JSON):
+
+```
+{
+  "userId": 123,
+  "notificationId": 1,
+  "action": "acknowledge"
+}
+```
+
+To join the group `http://localhost:5050/join-group/321/987`
+
+to send the group notification `http://localhost:5050/send-group-notification/321`
+
+### Body (raw JSON):
+
+```
+{
+  "message": "Group announcement from 321 for all members!",
+  "username": "Team Lead",
+  "profileImage": "https://via.placeholder.com/50",
+  "source": "Team Chat",
+  "notificationType": "group"
+}
+
 ```
