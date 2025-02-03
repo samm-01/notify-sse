@@ -9,7 +9,7 @@ This project implements a Notification System that uses Server-Sent Events (SSE)
 - Key: Content-Type
 - Value: application/json
 
-## Post req to broadcast notification to all users `http://localhost:5050/send-notification`
+Post req to broadcast notification to all users `http://localhost:5050/send-notification`
 
 ### Body (raw JSON):
 
@@ -24,7 +24,7 @@ This project implements a Notification System that uses Server-Sent Events (SSE)
 
 ```
 
-## To mark the notification as read `http://localhost:5050/notification-response`
+To mark the notification as read `http://localhost:5050/notification-response`
 
 ### Body (raw JSON):
 
@@ -36,9 +36,9 @@ This project implements a Notification System that uses Server-Sent Events (SSE)
 }
 ```
 
-## To join the group `http://localhost:5050/join-group/321/987`
+To join the group `http://localhost:5050/join-group/321/987`
 
-## To send the group notification `http://localhost:5050/send-group-notification/321`
+To send the group notification `http://localhost:5050/send-group-notification/321`
 
 ### Body (raw JSON):
 
