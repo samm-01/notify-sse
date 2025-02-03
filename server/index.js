@@ -5,6 +5,9 @@ require("dotenv").config();
 
 const app = express();
 const port = 5050;
+// const { PutObjectCommand } = require("@aws-sdk/client-s3");
+// const s3 = require("./s3-config.js"); // Import the configured S3 client
+
 
 app.use(cors());
 app.use(express.json());
@@ -24,6 +27,77 @@ db.connect(err => {
         console.log("Connected to the database");
     }
 });
+
+
+// AWS SDK configuration -- Docker
+// const AWS = require("aws-sdk");
+
+// const s3 = new AWS.S3({
+//     endpoint: "http://localhost:9000", 
+//     accessKeyId: "admin",
+//     secretAccessKey: "admin123",
+//     s3ForcePathStyle: true, // Required for MinIO
+//     signatureVersion: "v4"
+// });
+
+
+// const uploadFile = async (fileBuffer, fileName, userId) => {
+//     try {
+//         const params = {
+//             Bucket: process.env.S3_BUCKET,
+//             Key: fileName,
+//             Body: fileBuffer,
+//             ContentType: "application/pdf", // Adjust for different file types
+//         };
+
+//         await s3.send(new PutObjectCommand(params));
+
+//         // Generate the file URL
+//         const fileUrl = `http://localhost:9000/${process.env.S3_BUCKET}/${fileName}`; // MinIO URL
+
+//         console.log("File uploaded successfully!", fileUrl);
+
+//         // Store the file URL in the database as a notification
+//         const message = `New document uploaded: ${fileName}`;
+//         storeNotification(userId, message, null, null, fileUrl, "document_upload");
+
+//         return fileUrl;
+//     } catch (error) {
+//         console.error("Upload error:", error);
+//     }
+// };
+
+// app.post("/upload", async (req, res) => {
+//     try {
+//         const { userId } = req.body; // Ensure userId is sent in request
+//         if (!req.files || !req.files.file) {
+//             return res.status(400).send("No file uploaded");
+//         }
+
+//         const file = req.files.file;
+//         const fileName = `${Date.now()}_${file.name}`;
+
+//         // Upload the file and get the URL
+//         const fileUrl = await uploadFile(file.data, fileName, userId);
+
+//         // Notify the connected user via SSE
+//         if (clientMap.has(userId)) {
+//             const notification = {
+//                 message: `New document uploaded: ${fileName}`,
+//                 source: fileUrl,
+//                 notificationType: "document_upload",
+//                 timestamp: new Date(),
+//             };
+//             clientMap.get(userId).write(`data: ${JSON.stringify(notification)}\n\n`);
+//         }
+
+//         res.status(200).json({ message: "File uploaded and notification sent", fileUrl });
+//     } catch (error) {
+//         console.error("File upload error:", error);
+//         res.status(500).send("Error uploading file");
+//     }
+// });
+
 
 // Store all connected clients
 let clients = [];
@@ -54,27 +128,31 @@ const storeNotification = (userId, message, username, profileImage, source, noti
  */
 app.get("/notifications/:userId", (req, res) => {
     const userId = req.params.userId;
-
-    // Set necessary SSE headers
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
 
-    // Store client connection
-    clients.push(res);
-    clientMap.set(userId, res);
+    db.query("SELECT * FROM notifications WHERE userId = ? ORDER BY timestamp DESC", [userId], (err, results) => {
+        if (err) {
+            console.error("Error fetching notifications:", err);
+            res.status(500).send("Error fetching notifications");
+            return;
+        }
 
-    // Cleanup on disconnect
-    req.on("close", () => {
-        clients = clients.filter(client => client !== res);
-        clientMap.delete(userId);
-        groups.forEach((members, groupId) => {
-            members.delete(userId);
-            if (members.size === 0) groups.delete(groupId);
+        results.forEach((notif) => {
+            res.write(`data: ${JSON.stringify(notif)}\n\n`);
         });
     });
+
+    setInterval(() => {
+        db.query("SELECT * FROM notifications WHERE userId = ? ORDER BY timestamp DESC LIMIT 1", [userId], (err, results) => {
+            if (!err && results.length > 0) {
+                res.write(`data: ${JSON.stringify(results[0])}\n\n`);
+            }
+        });
+    }, 5000);
 });
+
 
 /**
  * Broadcast Notification to All Connected Clients
@@ -206,6 +284,32 @@ app.post("/notification-response", (req, res) => {
         res.json({ success: true, message: `Action '${action}' recorded for notification ${notificationId}` });
     });
 });
+
+app.get("/get-notifications/:userId", (req, res) => {
+    const { userId } = req.params;
+
+    // Query to get notifications for the user, ordered by timestamp
+    const query = `SELECT id, message, username, profile_image, source, status, timestamp, notification_type 
+                   FROM notifications 
+                   WHERE user_id = ? 
+                   ORDER BY timestamp DESC`;
+
+    db.query(query, [userId], (err, result) => {
+        if (err) {
+            console.error('Error fetching notifications:', err);
+            return res.status(500).send('Error fetching notifications');
+        }
+
+        // If no notifications are found
+        if (result.length === 0) {
+            return res.status(404).send('No notifications found');
+        }
+
+        // Send the notifications back to the client
+        res.status(200).json(result);
+    });
+});
+
 
 
 // Start the server

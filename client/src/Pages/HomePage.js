@@ -10,13 +10,32 @@ function NotificationSystem() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [newNotification, setNewNotification] = useState(false);
 
+    // Fetch notifications on component mount
     useEffect(() => {
+        const fetchNotifications = async () => {
+            try {
+                const response = await fetch(`http://localhost:5050/get-notifications/${userId}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    console.log("Fetched Notifications:", data);
+                    setNotifications(data); // Set the fetched notifications
+                } else {
+                    console.error("Error fetching notifications:", data);
+                }
+            } catch (error) {
+                console.error("Network error:", error);
+            }
+        };
+
+        fetchNotifications();
+
         // Connect to the SSE endpoint with userId
         const eventSource = new EventSource(`http://localhost:5050/notifications/${userId}`);
 
         eventSource.onmessage = (event) => {
             const newNotif = JSON.parse(event.data);
-            setNotifications((prev) => [newNotif, ...prev]);
+            setNotifications((prev) => [newNotif, ...prev]); // Add the new notification to the top of the list
             setNewNotification(true);
         };
 
@@ -32,6 +51,7 @@ function NotificationSystem() {
         setShowNotifications(!showNotifications);
         setNewNotification(false);
     };
+
     const navigate = useNavigate();
 
     const goToNotificationsPage = () => {
